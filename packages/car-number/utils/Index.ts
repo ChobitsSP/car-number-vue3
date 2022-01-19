@@ -1,3 +1,6 @@
+import { Ref, onBeforeUnmount } from 'vue';
+import { Observable } from "rxjs";
+
 export const provinceList = [
   '京',
   '津',
@@ -74,3 +77,48 @@ export const letterList = [
   'Y',
   'Z'
 ];
+
+interface RxKeyDownProps {
+  visible: Ref<boolean>;
+  onKeyDown: (code: string) => void;
+}
+
+/**
+ * 监听键盘
+ * @param code 
+ * @returns 
+ */
+export function useRxKeyDown(props: RxKeyDownProps) {
+  const sub = Observable.fromEvent<KeyboardEvent>(document, "keydown")
+    .filter(() => props.visible.value)
+    .filter(e => {
+      if (e.code === 'Backspace') return true;
+      if (/^Key[A-Z]$/.test(e.code)) return true;
+      if (/^Digit[0-9]$/.test(e.code)) return true;
+      return false;
+    })
+    .do(e => {
+      e.preventDefault();
+      e.stopPropagation();
+    })
+    .map(e => e.code)
+    .subscribe((code) => {
+      if (code === 'Backspace') {
+        props.onKeyDown(code);
+        return;
+      }
+      if (/^Key[A-Z]$/.test(code)) {
+        props.onKeyDown(code[3]);
+        return;
+      }
+      if (/^Digit[0-9]$/.test(code)) {
+        props.onKeyDown(code[5]);
+        return;
+      }
+      console.log(code);
+    });
+
+  onBeforeUnmount(() => {
+    sub.unsubscribe();
+  });
+}
