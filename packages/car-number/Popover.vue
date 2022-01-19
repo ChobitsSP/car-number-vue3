@@ -1,7 +1,9 @@
 <template>
-  <el-popover :width="600"
-              ref="popover"
+  <el-popover v-model:visible="visible"
+              :width="600"
               @show="onShow"
+              :show-arrow="false"
+              popper-class="my-popper"
               trigger="click">
     <template #reference>
       <slot name="reference">
@@ -9,12 +11,13 @@
       </slot>
     </template>
     <template #default>
-      <div style="height: 260px; width: 100%;">
+      <div style="height: 250px; width: 100%;position:relative;">
         <div class="car__number__container">
           <div class="mask__container"
                :style="{backgroundColor: maskBackground}"></div>
           <!-- 输入框 -->
-          <div>
+          <div class="input-row"
+               style=" position:absolute;top:4px;left:200px; z-index:999999999;">
             <slot :value="inputValue">
               <div class="input__container"
                    :style="{border: `1px solid ${borderColor}`, borderRadius: borderRadius + 'px', width: width + 'px', height: height + 'px', backgroundColor: backgroundColor}">
@@ -35,9 +38,11 @@
             <div class="keyboard__container">
               <header class="keybord__header">
                 <el-button size="mini"
-                           @click.stop="cancel()">清空</el-button>
+                           class="mini-btn"
+                           @click.stop="inputValue = []">清空</el-button>
                 <el-button size="mini"
                            type="primary"
+                           class="mini-btn"
                            :disabled="inputValue.length < carNumberLength"
                            @click.stop="submit()">确定</el-button>
               </header>
@@ -91,7 +96,7 @@
                       {{ item }}
                     </li>
                   </ul>
-                  <div @click.stop="deleteOne()"
+                  <div @click.stop="inputValue.pop()"
                        class="other__button">
                     <i class="iconfont-cjc icon-cjc-delete delete__btn"></i>
                   </div>
@@ -106,10 +111,10 @@
 </template>
 
 <script lang="ts">
-  import { defineComponent, ref, watch, computed } from 'vue';
+  import { defineComponent, ref, watch, computed, onBeforeUnmount } from 'vue';
   import CarNoKeyboard from './Index.vue';
   import * as MyUtils from './utils/Index';
-  import { ElPopover } from 'element-plus';
+  import { Observable } from "rxjs";
 
   export default defineComponent({
     components: {
@@ -176,13 +181,11 @@
     },
     emits: ['update:modelValue'],
     setup(props, context) {
-      const popover = ref<InstanceType<typeof ElPopover>>();
+      const visible = ref(false);
 
       const inputValue = ref<string[]>([]);
       // const carNumberLength = ref(7);
       const keybordType = ref('ABC');
-      const placehoderDom = ref();
-      const isOcclusion = ref(false);
       const provinceList = ref(MyUtils.provinceList);
       const letterList = ref(MyUtils.letterList);
 
@@ -228,8 +231,21 @@
         }
       };
 
+      // 监听键盘输入
+      MyUtils.useRxKeyDown({
+        visible: visible,
+        onKeyDown: code => {
+          if (code === 'Backspace') {
+            inputValue.value.pop();
+          }
+          else if (inputValue.value.length < carNumberLength.value) {
+            inputValue.value.push(code);
+          }
+        },
+      });
+
       return {
-        popover,
+        visible,
         inputValue,
         carNumberLength,
         keybordType,
@@ -238,13 +254,9 @@
         letterList,
         onShow,
 
-        // 清空
-        cancel() {
-          inputValue.value = [];
-        },
         // 完成输入
         submit() {
-          popover.value.hide();
+          visible.value = false;
           context.emit('update:modelValue', inputValue.value.join(''));
         },
         // 键盘类型切换
@@ -253,32 +265,10 @@
           if (inputValue.value.length > 0 && inputValue.value.length < len) return
           keybordType.value = keybordType.value === 'ABC' ? '返回' : 'ABC'
         },
-        // 删除一个字符
-        deleteOne() {
-          inputValue.value.pop();
-        },
         // 输入
         inputWord(val: string) {
           if (inputValue.value.length === carNumberLength.value) return;
           inputValue.value.push(val);
-        },
-        // 检测键盘是否遮挡输入框
-        checkOcclusion() {
-          // const clientHeight = document.documentElement.clientHeight
-          // const scrollHeight = document.documentElement.scrollHeight
-          // const inputTopHeight = this.inputContainer.getBoundingClientRect().top
-          // const inputHeight = this.inputContainer.scrollHeight
-          // // 键盘是否挡住输入框
-          // this.isOcclusion = inputHeight + 250 + inputTopHeight >= clientHeight
-          // // 如果输入框被挡住，并且页面没有滚动条,返回true
-          // if (
-          //   inputHeight + 250 + inputTopHeight >= clientHeight &&
-          //   scrollHeight === clientHeight
-          // ) {
-          //   return true
-          // } else {
-          //   return false
-          // }
         },
       };
     },
@@ -286,6 +276,11 @@
 </script>
 
 <style scoped>
+  .mini-btn {
+    margin-top: 8px;
+    width: 60px;
+    height: 10px;
+  }
   .car__number__container {
     user-select: none;
   }
@@ -328,14 +323,16 @@
     height: 50%;
   }
   .car__number__container .keyboard__container {
-    position: fixed;
+    /* position: fixed; */
+    position: absolute;
     z-index: 999;
     bottom: 0;
     left: 0;
     width: 100%;
     height: 250px;
     background: #d0d3dc;
-    box-shadow: 0 6px 10px 3px #959595;
+    /* box-shadow: 0 6px 10px 3px #959595; */
+    box-shadow: none;
   }
   .car__number__container .keyboard__container .keybord__header {
     padding: 0 15px;
